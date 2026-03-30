@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import os,sys
 from dotenv import load_dotenv
+import logging
 
 env_path = Path(__file__).resolve().parent.parent / 'config' / '.env'
 load_dotenv(env_path)
@@ -32,9 +33,8 @@ def all_challengers_players(url:str) -> list:
             
         return puuids
     except requests.exceptions.RequestException as e:
-        print(f'Erro ao conectar-se a API da riot {e}')
+        logging.error(f'Erro ao conectar-se a API da riot {e}')
         return
     
     
-def all_matches_id() -> list:
-    pass
+all_challengers_players(url)
