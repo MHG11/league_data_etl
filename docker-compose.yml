@@ -10,7 +10,7 @@ services:
   # 2. O Coordenador do Kafka (Zookeeper)
   # O Kafka tradicional precisa do Zookeeper para gerenciar os nós e os tópicos
   zookeeper:
-    image: confluentinc/cp-zookeeper:latest
+    image: confluentinc/cp-zookeeper:7.4.4
     container_name: zookeeper_riot
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
@@ -19,7 +19,7 @@ services:
 
   # 3. A nossa Esteira de Eventos (Apache Kafka)
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.4.4
     container_name: kafka_riot
     depends_on:
       - zookeeper
@@ -28,7 +28,10 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      # Aqui dizemos pro Kafka liberar a porta 9092 para o seu script Python local
+      # A MÁGICA ENTRA AQUI NESTAS 3 LINHAS:
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     restart: unless-stopped

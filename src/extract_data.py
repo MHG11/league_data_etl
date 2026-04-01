@@ -4,6 +4,7 @@ from pathlib import Path
 import os,sys
 from dotenv import load_dotenv
 import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s ')
 
 env_path = Path(__file__).resolve().parent.parent / 'config' / '.env'
 load_dotenv(env_path)
