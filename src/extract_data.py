@@ -13,6 +13,7 @@ env_path = Path(__file__).resolve().parent.parent / 'config' / '.env'
 load_dotenv(env_path)
 
 RIOT_API_KEY = os.getenv('API_KEY')
+ROUTING = 'americas'
 REGION = 'br1'
 url = f'https://{REGION}.api.riotgames.com/lol/league/v4/challengerleagues/by-queue/RANKED_SOLO_5x5'
 HEADERS = {
@@ -71,6 +72,31 @@ def get_match_ids() -> list:
         
     logging.info(f"Extração concluída! Total de partidas únicas coletadas: {len(todas_partidas)}")
     return todas_partidas
+
+def get_timeline_match() -> list:
+    path_read = 'data/matchs_ids.json'
+    with open(path_read, 'r') as f:
+        matchId = json.load(f)
+    
+    matchs_timeline = []
+        
+    for matchids in matchId:
+        try:
+            url = f'https://{ROUTING}.api.riotgames.com/lol/match/v5/matches/{matchids}/timeline'
+            response = requests.get(url, timeout=10, headers=HEADERS)
+        
+            if response.status_code == 200:
+                data = response.json()
+                matchs_timeline.append(data)
+                logging.info(f'Time line da match {matchids} coletada com sucesso.')
+            else:
+                logging.warning(f'Erro {response.status_code} ao buscar {matchId}')
+        except Exception as e:
+            logging.error('Erro na requisição: ', e)
+        
+        time.sleep(1.2)
+    return matchs_timeline
+    
     
 def processar_partidas_unicas():
     #Conectando ao Redis rodando localmente via docker
@@ -106,6 +132,8 @@ def processar_partidas_unicas():
                 logging.error(f'Erro {e} na partida {match_id}')
             time.sleep(1.2)
     
+def orchestrate_producer():
+    pass
 
 #all_challengers_players(url)
 all_matches_id()
