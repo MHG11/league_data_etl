@@ -1,4 +1,6 @@
 from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, ArrayType, BooleanType
+from pyspark.sql.functions import col, from_json, explode
 import logging
 import pyspark
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s ')
@@ -14,6 +16,7 @@ def inciar_consumidor():
     spark = SparkSession.builder \
         .appName('RiotGames_Streaming_Consumer') \
         .config('spark.jars.packages', pacote_kafka) \
+        .config('spark.driver.memory', '4g') \
         .getOrCreate()
         
     # Deixa os logs do spark menos barulhentos exibindo só erros graves.
@@ -27,6 +30,7 @@ def inciar_consumidor():
         .option('kafka.bootstrap.servers', 'localhost:9092') \
         .option('subscribe', 'lol_partidas') \
         .option('startingOffsets', 'earliest') \
+        .option('maxOffsetsPerTrigger', 50) \
         .load()
      
     # Para traduzir de bytes para string, especialmente a coluna value.
@@ -35,8 +39,41 @@ def inciar_consumidor():
     
     logging.info('Conexão estabelecida! Esperando os dados chegarem... \n')
     
+    esquema_partida = StructType([
+    StructField("metadata", StructType([
+        StructField("matchId", StringType(), True)]), True),
+    
+    
+    StructField("info", StructType([
+        StructField("gameDuration", IntegerType(), True), 
+        StructField("participants", ArrayType(
+            StructType([
+                StructField("championName", StringType(), True),
+                StructField("win", BooleanType(), True)
+                ]), True))
+        ]), True),
+     
+    ])
+
+    df_estruturado = df_json.withColumn("dados_partidas", from_json(col("json_bruto"), esquema_partida))
+    
+    df_exploded = df_estruturado.select(
+        col("dados_partidas.metadata.matchId"),
+        col("dados_partidas.info.gameDuration"),
+        explode(col("dados_partidas.info.participants")).alias("jogador")
+    )
+    
+    df_final = df_exploded.select(
+        "matchId",
+        "gameDuration",
+        "jogador.championName",
+        "jogador.win"
+    )
+    
+   
+    
     # Imprimindo os resultados no terminal ao vivo
-    query = df_json.writeStream \
+    query = df_final.writeStream \
         .outputMode("append") \
         .format("console") \
         .option("truncate", "false") \
@@ -45,7 +82,7 @@ def inciar_consumidor():
     # Roda o script infinitamente até o CTRL + C ser pressionado.
     query.awaitTermination()
 
-    
+
 if __name__ == "__main__":
     inciar_consumidor()
         
