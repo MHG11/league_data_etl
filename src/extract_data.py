@@ -131,11 +131,51 @@ def processar_partidas_unicas():
             except Exception as e:
                 logging.error(f'Erro {e} na partida {match_id}')
             time.sleep(1.2)
-    
-def orchestrate_producer():
-    pass
+
+
+def extrair_alma_do_dragao(timeline_data: dict) -> str:
+
+    dragões_time_azul = 0 
+    dragões_time_vermelho = 0 
+
+    # Validação de segurança caso o JSON venha malformado ou vazio
+    if 'info' not in timeline_data or 'frames' not in timeline_data['info']:
+        return None
+
+    # 1. Itera pelos minutos do jogo (frames)
+    for frame in timeline_data['info']['frames']:
+        
+        # 2. Itera pelos eventos de cada minuto
+        # O .get('events', []) evita erro caso um frame venha sem a chave 'events'
+        for event in frame.get('events', []):
+            
+            # 3. Filtra apenas a morte de DRAGÕES
+            if event.get('type') == 'MONSTER_KILL' and event.get('monsterType') == 'DRAGON':
+                killer_id = event.get('killerId')
+                dragon_subtype = event.get('monsterSubType') # O elemento do dragão
+
+                # Verifica se o evento tem os dados necessários
+                if killer_id is None or dragon_subtype is None:
+                    continue
+
+                # 4. Lógica de contagem por time usando o ID do jogador
+                if 1 <= killer_id <= 5:
+                    dragões_time_azul += 1
+                    # Se chegou no 4º dragão, conquistou a Alma!
+                    if dragões_time_azul == 4:
+                        return dragon_subtype
+                        
+                elif 6 <= killer_id <= 10:
+                    dragões_time_vermelho += 1
+                    # Se chegou no 4º dragão, conquistou a Alma!
+                    if dragões_time_vermelho == 4:
+                        return dragon_subtype
+
+    # 5. Se o loop terminar e ninguém tiver feito 4 dragões, o jogo acabou sem Alma
+    return None
 
 #all_challengers_players(url)
-all_matches_id()
-get_match_ids()
-processar_partidas_unicas()
+#all_matches_id()
+#get_match_ids()
+get_timeline_match()
+#processar_partidas_unicas()
