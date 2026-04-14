@@ -72,66 +72,7 @@ def get_match_ids() -> list:
         
     logging.info(f"Extração concluída! Total de partidas únicas coletadas: {len(todas_partidas)}")
     return todas_partidas
-
-def get_timeline_match() -> list:
-    path_read = 'data/matchs_ids.json'
-    with open(path_read, 'r') as f:
-        matchId = json.load(f)
     
-    matchs_timeline = []
-        
-    for matchids in matchId:
-        try:
-            url = f'https://{ROUTING}.api.riotgames.com/lol/match/v5/matches/{matchids}/timeline'
-            response = requests.get(url, timeout=10, headers=HEADERS)
-        
-            if response.status_code == 200:
-                data = response.json()
-                matchs_timeline.append(data)
-                logging.info(f'Time line da match {matchids} coletada com sucesso.')
-            else:
-                logging.warning(f'Erro {response.status_code} ao buscar {matchId}')
-        except Exception as e:
-            logging.error('Erro na requisição: ', e)
-        
-        time.sleep(1.2)
-    return matchs_timeline
-    
-    
-def processar_partidas_unicas():
-    #Conectando ao Redis rodando localmente via docker
-    banco_redis = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
-    producer = KafkaProducer(
-        bootstrap_servers=['localhost:9092'],
-        value_serializer=lambda v: json.dumps(v).encode('utf-8')
-    )
-    
-    with open('data/matchs_ids.json', 'r') as f:
-        lista_de_ids = json.load(f)
-        
-    logging.info(f'Iniciando a verificação de {len(lista_de_ids)} partidas...')
-    
-    for match_id in lista_de_ids:
-        #Verifica de o id da partida já existe no json, caso sim, ignora.
-        if banco_redis.exists(match_id):
-            logging.info(f'Partida {match_id} já processada anteriormente. Pulando! ⏭️')
-            continue
-        else:
-            url_partida = f'https://americas.api.riotgames.com/lol/match/v5/matches/{match_id}?api_key={RIOT_API_KEY}'
-            try:
-                response = requests.get(url_partida, timeout=10)
-                if response.status_code == 200:
-                    partida_completa = response.json()
-                    
-                    #Arremessa o JSON das partidas completas para a esteira do kafka
-                    producer.send('lol_partidas', partida_completa)
-                    
-                    banco_redis.set(match_id,"processado")
-                    logging.info(f'Partida {match_id} enviada com sucesso para o kafka.')
-            except Exception as e:
-                logging.error(f'Erro {e} na partida {match_id}')
-            time.sleep(1.2)
-
 
 def extrair_alma_do_dragao(timeline_data: dict) -> str:
 
@@ -174,6 +115,60 @@ def extrair_alma_do_dragao(timeline_data: dict) -> str:
     # 5. Se o loop terminar e ninguém tiver feito 4 dragões, o jogo acabou sem Alma
     return None
 
+def producer():
+    banco_redis = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    kafka_producer = KafkaProducer(
+        bootsrap_servers=['localhost:9092'],
+        value_serializer=lambda v: json.dumps(v).encode('utf-8')
+    )
+    
+    with open('data/matchs_ids.json', 'r') as f:
+        lista_de_ids = json.load(f)
+        
+    logging.info(f'Iniciando o Producer ETL para {len(lista_de_ids)} partidas...')
+    
+    for match_id in lista_de_ids:
+        if banco_redis.exists(match_id):
+            logging.info(f'Partida {match_id} já processada anteriormente. Pulando ⏭️')   
+            continue
+        
+        try:
+            url_partida = f'https://americas.api.riotgames.com/lol/match/v5/matches/{match_id}'
+            url_timeline = f'https://americas.api.riotgames.com/lol/match/v5/matches/{match_id}/timeline'
+            
+            resp_partida = requests.get(url_partida, headers=HEADERS, timeout=10)
+            resp_timeline = requests.get(url_timeline, headers=HEADERS, timeout=10)
+            
+            if resp_partida.status_code == 200 and resp_timeline.status_code == 200:
+                match_data = resp_partida.json()
+                timeline_data = resp_timeline.json()
+                
+                alma_conquistada = extrair_alma_do_dragao(timeline_data)
+                
+                time_vencedor = None
+                for team in match_data.get('info', {}).get('teams', []):
+                    if team.get('win'):
+                        time_vencedor = team.get('teamId')
+
+                payload_enriquecido = {
+                    "match_id": match_id,
+                    "game_duration_seconds": match_data['info']['gameDuration'],
+                    "winning_team": time_vencedor,
+                    "dragon_soul": alma_conquistada
+                }
+                
+                kafka_producer.send('lol_winrates_enriched', payload_enriquecido)
+                
+                banco_redis.set(match_id, "processando")
+                logging.info(f'Sucesso: Partida {match_id} enriquecida e enviada pro Kafka')
+            else: 
+                logging.warning(f'Erro nas requisições da partida {match_id}. Match: {resp_partida.status_code} | Timeline: {resp_timeline.status_code}')
+        except Exception as e:
+            logging.error(f'Erro inesperado no pipeline da partida {match_id}: {e}')
+        
+        time.sleep(1.2) 
+    
+    
 #all_challengers_players(url)
 #all_matches_id()
 #get_match_ids()
