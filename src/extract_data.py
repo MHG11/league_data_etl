@@ -78,7 +78,7 @@ def extrair_alma_do_dragao(timeline_data: dict) -> str:
 
     dragões_time_azul = 0 
     dragões_time_vermelho = 0 
-
+    
     # Validação de segurança caso o JSON venha malformado ou vazio
     if 'info' not in timeline_data or 'frames' not in timeline_data['info']:
         return None
@@ -89,14 +89,14 @@ def extrair_alma_do_dragao(timeline_data: dict) -> str:
         # 2. Itera pelos eventos de cada minuto
         # O .get('events', []) evita erro caso um frame venha sem a chave 'events'
         for event in frame.get('events', []):
-            
+        
             # 3. Filtra apenas a morte de DRAGÕES
-            if event.get('type') == 'MONSTER_KILL' and event.get('monsterType') == 'DRAGON':
+            if event.get('type') == 'ELITE_MONSTER_KILL' and event.get('monsterType') == 'DRAGON':
                 killer_id = event.get('killerId')
                 dragon_subtype = event.get('monsterSubType') # O elemento do dragão
 
                 # Verifica se o evento tem os dados necessários
-                if killer_id is None or dragon_subtype is None:
+                if killer_id is None:
                     continue
 
                 # 4. Lógica de contagem por time usando o ID do jogador
@@ -104,21 +104,21 @@ def extrair_alma_do_dragao(timeline_data: dict) -> str:
                     dragões_time_azul += 1
                     # Se chegou no 4º dragão, conquistou a Alma!
                     if dragões_time_azul == 4:
-                        return dragon_subtype
+                        return str(dragon_subtype)
                         
                 elif 6 <= killer_id <= 10:
                     dragões_time_vermelho += 1
                     # Se chegou no 4º dragão, conquistou a Alma!
                     if dragões_time_vermelho == 4:
-                        return dragon_subtype
-
-    # 5. Se o loop terminar e ninguém tiver feito 4 dragões, o jogo acabou sem Alma
-    return None
+                        return str(dragon_subtype)
+    return "Sem alma"
 
 def producer():
+    data_timeline = []
+    output_path = 'data/timeline.json'
     banco_redis = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
     kafka_producer = KafkaProducer(
-        bootsrap_servers=['localhost:9092'],
+        bootstrap_servers=['localhost:9092'],
         value_serializer=lambda v: json.dumps(v).encode('utf-8')
     )
     
@@ -142,8 +142,9 @@ def producer():
             if resp_partida.status_code == 200 and resp_timeline.status_code == 200:
                 match_data = resp_partida.json()
                 timeline_data = resp_timeline.json()
-                
+
                 alma_conquistada = extrair_alma_do_dragao(timeline_data)
+
                 
                 time_vencedor = None
                 for team in match_data.get('info', {}).get('teams', []):
@@ -167,10 +168,5 @@ def producer():
             logging.error(f'Erro inesperado no pipeline da partida {match_id}: {e}')
         
         time.sleep(1.2) 
-    
-    
-#all_challengers_players(url)
-#all_matches_id()
-#get_match_ids()
-get_timeline_match()
-#processar_partidas_unicas()
+        
+producer()
