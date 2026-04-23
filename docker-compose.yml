@@ -7,6 +7,7 @@ services:
       - "6379:6379"
     restart: unless-stopped
 
+
   # 2. O Coordenador do Kafka (Zookeeper)
   # O Kafka tradicional precisa do Zookeeper para gerenciar os nós e os tópicos
   zookeeper:
@@ -35,3 +36,18 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     restart: unless-stopped
+
+  postgres-db: # Nome do serviço (importante para o Consumer!)
+    image: postgres:16
+    container_name: postgres_pipeline
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 3695
+      POSTGRES_DB: lol_data
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

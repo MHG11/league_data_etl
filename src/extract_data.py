@@ -83,14 +83,14 @@ def extrair_alma_do_dragao(timeline_data: dict) -> str:
     if 'info' not in timeline_data or 'frames' not in timeline_data['info']:
         return None
 
-    # 1. Itera pelos minutos do jogo (frames)
+    #Itera pelos minutos do jogo (frames)
     for frame in timeline_data['info']['frames']:
         
-        # 2. Itera pelos eventos de cada minuto
+        # Itera pelos eventos de cada minuto
         # O .get('events', []) evita erro caso um frame venha sem a chave 'events'
         for event in frame.get('events', []):
         
-            # 3. Filtra apenas a morte de DRAGÕES
+            # Filtra apenas a morte de DRAGÕES
             if event.get('type') == 'ELITE_MONSTER_KILL' and event.get('monsterType') == 'DRAGON':
                 killer_id = event.get('killerId')
                 dragon_subtype = event.get('monsterSubType') # O elemento do dragão
@@ -99,7 +99,7 @@ def extrair_alma_do_dragao(timeline_data: dict) -> str:
                 if killer_id is None:
                     continue
 
-                # 4. Lógica de contagem por time usando o ID do jogador
+                # Lógica de contagem por time usando o ID do jogador
                 if 1 <= killer_id <= 5:
                     dragões_time_azul += 1
                     # Se chegou no 4º dragão, conquistou a Alma!
@@ -145,7 +145,6 @@ def producer():
 
                 alma_conquistada = extrair_alma_do_dragao(timeline_data)
 
-                
                 time_vencedor = None
                 for team in match_data.get('info', {}).get('teams', []):
                     if team.get('win'):
@@ -168,5 +167,7 @@ def producer():
             logging.error(f'Erro inesperado no pipeline da partida {match_id}: {e}')
         
         time.sleep(1.2) 
-        
+
+all_challengers_players(url)
+get_match_ids()
 producer()

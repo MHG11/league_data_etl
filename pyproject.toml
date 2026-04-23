@@ -11,4 +11,5 @@ dependencies = [
     "pandas>=3.0.1",
     "kafka-python>=2.3.0",
     "pyspark>=4.1.1",
+    "psycopg2-binary>=2.9.12",
 ]
