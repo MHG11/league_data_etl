@@ -115,7 +115,6 @@ def extrair_alma_do_dragao(timeline_data: dict) -> str:
 
 def producer():
     data_timeline = []
-    output_path = 'data/timeline.json'
     banco_redis = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
     kafka_producer = KafkaProducer(
         bootstrap_servers=['localhost:9092'],
